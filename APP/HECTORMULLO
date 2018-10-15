@@ -1,0 +1,119 @@
+#
+# This is a Shiny web application. You can run the application by clicking
+# the 'Run App' button above.
+#
+# Find out more about building applications with Shiny here:
+#
+#    http://shiny.rstudio.com/
+#
+
+library(shiny)
+library(DT)
+library(highcharter)
+library(ggplot2)
+library(dplyr)
+library(xts)
+library(TeachingSampling)
+data(Lucy)
+
+ui <- fluidPage(
+  titlePanel("Análisis de ingresos, número de empleados e impuestos
+             pagados por empresas Colombianas en 2008"),
+  sidebarLayout(
+    sidebarPanel(
+      
+      conditionalPanel(condition = "input.pestaña=='Matriz de informacion'",
+                       numericInput("n", "Número de registros", value = 5, 
+                                    min = 1, max = 100)),
+      
+      conditionalPanel(condition = "input.pestaña=='Ingresos'",
+                       sliderInput("bins1","Número de clases:",
+                                   min =1,max = 200,
+                                   value = round(sqrt(length(Lucy[,1]))))),
+      
+      conditionalPanel(condition = "input.pestaña=='Numero de empleados'",
+                       sliderInput("bins2","Número de clases:",
+                                   min =1,max = 200,
+                                   value = round(sqrt(length(Lucy[,1]))))),
+      
+      conditionalPanel(condition = "input.pestaña=='Impuestos'",
+                       sliderInput("bins3","Número de clases:",
+                                   min =1,max = 200,
+                                   value = round(sqrt(length(Lucy[,1]))))),
+      
+      conditionalPanel(condition = "input.pestaña=='Relación entre variables'",
+                       textInput("z", "Ingrese Zona",value = "A"))
+    ), 
+    
+    #Termina la pantalla izquierda
+    
+    mainPanel(
+      tabsetPanel(
+        tabPanel("Matriz de informacion", 
+                 div(DTOutput("tabla"),style = "font-size:60%")
+        ),
+        
+        navbarMenu("Gráficos",
+                   tabPanel("Ingresos", plotOutput("distPlot1")),
+                   tabPanel("Numero de empleados",plotOutput("distPlot2")),
+                   tabPanel("Impuestos",plotOutput("distPlot3")),
+                   tabPanel("Publicidad con mensajes",plotOutput("distPlot4"))
+        ),
+        
+        tabPanel("Relación entre variables",tableOutput("Lucy1"),
+                 highchartOutput("graf")),id="pestaña"
+      )
+    )
+  )
+)
+
+server <- function(input, output) {
+  
+  output$tabla <- renderDT({
+    datatable(Lucy[c(1:input$n),], 
+              fillContainer=TRUE,
+              extensions = c('Buttons', 'Scroller'), options = list(
+                dom = 'Bfrtip',
+                buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+                deferRender = TRUE,
+                scrollY = 200,
+                scroller = TRUE,
+                language = list(
+                  url = '//cdn.datatables.net/plug-ins/1.10.11/i18n/Spanish.json')
+              ))})
+  
+  output$distPlot1 <- renderPlot({
+    x    <- Lucy[, 5] 
+    bins1 <- seq(min(x), max(x), length.out = input$bins1 + 1)
+    hist(x, breaks = bins1, col = 'darkgray', border = 'white',
+         main = "Histograma de Ingresos en 2018")
+  })
+  
+  output$distPlot2 <- renderPlot({
+    x    <- Lucy[, 6] 
+    bins2 <- seq(min(x), max(x), length.out = input$bins2 + 1)
+    hist(x, breaks = bins2, col = 'darkgray', border = 'white',
+         main = "Histograma del número de empleados en 2018")
+  })
+  
+  output$distPlot3 <- renderPlot({
+    x    <- Lucy[, 7] 
+    bins3 <- seq(min(x), max(x), length.out = input$bins3 + 1)
+    hist(x, breaks = bins3, col = 'darkgray', border = 'white',
+         main = "Histograma de impuestos pagados en 2018")
+  })  
+  
+  output$distPlot4 <- renderPlot({
+    pie <- ggplot(Lucy, aes(x = "", fill = SPAM)) +  geom_bar(width = 1)
+    pie + coord_polar(theta = "y") + 
+      labs(title= 'Gráfico de sectores de SPAM')
+  })
+  
+  output$graf <- renderHighchart({
+    Lucy1 <- Lucy %>% filter(Zone %in% input$z)
+    hchart(Lucy1, "scatter", hcaes(x = Employees, y = Income, group = SPAM)) %>% 
+      hc_exporting(
+        enabled = TRUE
+      )})
+}
+shinyApp(ui = ui, server = server)
